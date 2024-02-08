@@ -25,11 +25,6 @@ To run the models and evaluate their performance, you need to install the follow
 4. **pandas**: For data manipulation and analysis.
 5. **numpy**: For numerical computations.
 
-You can install them using pip, Python's package installer. Open your terminal or command prompt and run the following commands:
-
-```bash
-pip install scikit-learn tensorflow keras matplotlib seaborn pandas numpy
-```
 ## Dataset Overview
 A publicly available dataset from SGCC (State Grid Corporation of China) is used for the training of models. This dataset is curated to support the development and evaluation of machine-learning models aimed at detecting electricity theft. It comprises various features indicative of consumer electricity usage patterns, potentially flagged for irregularities that may suggest theft.
 
@@ -52,7 +47,7 @@ In the process of preparing our dataset for the electricity theft detection proj
 To address these challenges, we implemented the following solutions:
 
 - **For Missing Values**:
-  - KNN Imputer (k=20)
+  - KNN Imputer 
 - **For Outliers:**
   - Local Outlier Factor (LOF)
 - **For Class Imbalance:**
@@ -61,78 +56,23 @@ To address these challenges, we implemented the following solutions:
 
 ### KNN Imputer 
 Missing values in the dataset can significantly impact the performance of machine learning models. We employed the KNN (K-Nearest Neighbors) imputer with k=20 to estimate and fill in these missing values. This method was chosen because it predicts the missing value based on the 20 nearest neighbors, providing a more nuanced and accurate imputation than simpler methods like mean or median imputation. It leverages the underlying patterns in the data, ensuring that the imputed values are realistic and consistent with the surrounding data points.
-```bash
-# Select columns for KNN imputation (excluding the label column)
-knn_imputation_data = data.iloc[:, 1:]
 
-# Create a KNNImputer instance
-knn_imputer = KNNImputer(n_neighbors=20)
-
-# Apply KNN imputation along axis=1
-imputed_data = knn_imputer.fit_transform(knn_imputation_data.T).T
-```
 ### Local Outlier Factor (LOF)
 The presence of outliers can skew the model training process, leading to poor generalization on unseen data. The LOF algorithm was utilized to identify and handle outliers in the dataset. By measuring the local density deviation of a given data point with respect to its neighbors, LOF helps in pinpointing observations that significantly differ from the norm. This approach is particularly effective for datasets where the definition of an "outlier" is not absolute but contextually dependent on the local data structure.
-```bash
-from sklearn.neighbors import LocalOutlierFactor
 
-# Create an instance of the Local Outlier Factor model
-lof = LocalOutlierFactor(n_neighbors=10, contamination='auto')
-
-# Fit the LOF model to the data and predict outliers
-outlier_predictions = lof.fit_predict(imputed_data_10)
-
-# Convert the outlier predictions to a boolean mask
-outlier_mask = outlier_predictions == -1
-
-# Calculate the median values for each column in imputed_data_10
-median_values = imputed_data_10.median()
-
-# Replace outliers with the median values
-imputed_data_10[outlier_mask] = median_values
-
-# Now, imputed_data_10 contains outliers replaced with median value
-LOF_DATA = imputed_data_10
-```
 
 
 ### ADASYN (Adaptive Synthetic Sampling)
 Class imbalance is a common issue in datasets, especially in contexts like electricity theft detection, where instances of theft may be much rarer than normal usage patterns. ADASYN was used to address this by generating synthetic samples of the minority class. It adaptively adjusts the number of synthetic samples according to the learning 
-difficulty of the minority class, thus improving model robustness and performance by providing a more balanced class distribution for training.
-```bash
-from imblearn.over_sampling import ADASYN
-
-# Convert imputed data to a DataFrame and prepare X, y
-imputed_data_10 = pd.DataFrame(imputed_data_10)
-X = imputed_data_10.iloc[:, 1:]  # Features
-y = data['FLAG']  # Labels
-
-# Apply ADASYN
-adasyn = ADASYN()
-X_adasyn, y_adasyn = adasyn.fit_resample(X, y)
-```
+the difficulty of the minority class, thus improving model robustness and performance by providing a more balanced class distribution for training.
 
 
 ### Near Miss
 As another technique to counteract class imbalance, Near Miss is an undersampling approach that selects samples from the majority class based on their distance to the minority class. This ensures that the remaining samples in the majority class are the most relevant for the model to learn the distinguishing characteristics of each class. By reducing the size of the majority class, Near Miss helps in equalizing the class distribution, facilitating a more effective learning process.
-```bash
-from imblearn.under_sampling import NearMiss
 
-# Apply NearMiss undersampling
-n_neighbors = min(sum(y_adasyn == 1), 3)  # Limit n_neighbors to the number of minority samples
-if n_neighbors == 0:
-    n_neighbors = 1  # Set a default value of 1 if there are no minority samples
-nm = NearMiss(sampling_strategy='auto', n_neighbors=n_neighbors, version=1)
-X_final, y_final = nm.fit_resample(X_adasyn, y_adasyn)
-```
 ## Splitting Data for Testing and Training
 In our project's data preparation phase, we utilized the `train_test_split` function from Scikit-learn's `model_selection` module to divide our dataset into training and testing sets. This crucial step allows us to train our machine learning models on a subset of the data (training set) and then evaluate their performance on unseen data (testing set). We specified a test size of 20% (`test_size=0.2`), meaning that 20% of the data is reserved for testing, while the remaining 80% is used for training. Additionally, we set a `random_state` of 42 to ensure reproducibility of our results. The variables `X_final` and `y_final` represent the processed features and target variable, respectively, ready to be used in training and evaluating our electricity theft detection models.
-```bash
-from sklearn.model_selection import train_test_split
 
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_final, y_final, test_size=0.2, random_state=42)
-```
 ## Model Training
 Each model was trained individually on the training dataset and eventually tested with the new unseen testing data, here's how it's done,
 
@@ -146,31 +86,6 @@ In our electricity theft detection project, we've implemented a sophisticated mo
 
 **Training:** The stacking model is trained on the dataset split into training and testing sets, with 80% of the data used for training and 20% reserved for testing, ensuring a balanced approach to learning and validation.
 
-```bash
-#Stacking
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import StackingClassifier
-
-
-# Define the base models
-base_models = [
-    ('logreg', LogisticRegression()),
-    ('rf', RandomForestClassifier())
-]
-
-# Define the meta-model
-meta_model = LogisticRegression()
-
-# Create the stacking model
-stacking_model = StackingClassifier(estimators=base_models, final_estimator=meta_model)
-
-# Train the stacking model on the training data
-stacking_model.fit(X_train, y_train)
-
-# Make predictions using the stacking model
-predictions = stacking_model.predict(X_test)
-```
 
 ### Multilayer Perceptron :
 We have constructed a neural network model to address the challenge of classifying electricity usage patterns. The process involves several critical steps, from data splitting and label encoding to hyperparameter optimization and model training, each tailored to enhance the model's predictive accuracy.
@@ -182,33 +97,6 @@ We have constructed a neural network model to address the challenge of classifyi
 **Neural Network Architecture:** Leveraging the insights gained from hyperparameter optimization, we constructed our neural network. The model features a dense layer with 192 units, employing a relu activation function for non-linearity, followed by an output layer with a softmax activation tailored for multi-class classification. This architecture is designed to capture the complex relationships within our data, facilitating accurate predictions of electricity theft.
 
 **Training and Evaluation:** The training process was meticulously planned, with the model being fed the standardized training data and the corresponding encoded labels. Over 50 epochs, the model learned to distinguish between normal and fraudulent electricity usage patterns, with the validation data providing a benchmark for its performance. This approach not only ensures the model's robustness but also its ability to generalize well to new, unseen data.
-
-```
-
-num_classes = 2  #  number of classes
-
-# Data Splitting  into training and testing  data sets
-X_train, X_test, y_train, y_test = train_test_split(X_final, y_final, test_size=0.2, random_state=42)
-
-# y_final is your original labels
-y_train_encoded = to_categorical(y_train, num_classes=num_classes)
-y_test_encoded = to_categorical(y_test, num_classes=num_classes)
-
-# Best Hyperparameters through (Hyper parameter Optimization)
-best_hyperparameters = {'units': 192, 'learning_rate': 0.0001}
-#neural network model
-model = Sequential()
-model.add(Dense(units=best_hyperparameters['units'], activation='relu', input_shape=(X_train.shape[1],)))
-model.add(Dense(num_classes, activation='softmax'))
-
-optimizer = Adam(learning_rate=best_hyperparameters['learning_rate'])
-model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
-
-# model Training
-model.fit(X_train, y_train_encoded, epochs=50, validation_data=(X_test, y_test_encoded))
-```
-
-
 
 
 ### Recurrent Neural Network :
@@ -225,64 +113,7 @@ we've taken an advanced approach by incorporating Recurrent Neural Networks (RNN
 **Dense Layers:** Fully connected layers with regularization (L2) and dropout to consolidate learned features into predictions.
 **Output Layer:** A single unit with a sigmoid activation function to output a probability, indicating the likelihood of electricity theft.
 **Compilation and Training:** The model is compiled with the Adam optimizer and binary cross-entropy loss, reflecting our binary classification goal. Training occurs over 50 epochs with a batch size of 128, including a validation split to monitor and mitigate overfitting.
-```
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization, LeakyReLU
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.optimizers import Adam
-from sklearn.preprocessing import StandardScaler
 
-
-# Assuming X_train_scaled, X_test_scaled, y_train, y_test are already defined and properly sequenced
-
-# Standardize the input features for the neural network
-scaler = StandardScaler()
-timesteps = 1  # Adjust this based on your specific data
-
-# Function to reshape the data into (samples, timesteps, features)
-def create_sequences(data, timesteps):
-    X = []
-    for i in range(len(data) - timesteps + 1):
-        X.append(data[i:(i + timesteps)])
-    return np.array(X)
-
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
-
-# Reshape data for LSTM layer
-
-X_train_scaled_reshaped = create_sequences(X_train_scaled, timesteps)
-X_test_scaled_reshaped = create_sequences(X_test_scaled, timesteps)
-# Adjust y_test to match the number of sequences in X_test_scaled_reshaped
-
-y_test_adjusted = y_test[timesteps - 1:]
-y_train_adjusted = y_train[timesteps - 1:]
-
-
-nn_model_rnn = Sequential([
-    LSTM(128, input_shape=(timesteps, X_train_scaled_reshaped.shape[2]), return_sequences=True),
-    LeakyReLU(),
-    BatchNormalization(),
-    Dropout(0.3),
-
-
-    Dense(64, kernel_regularizer=l2(0.001)),
-    LeakyReLU(),
-    Dropout(0.3),
-
-
-    Dense(32, kernel_regularizer=l2(0.001)),
-    LeakyReLU(),
-    Dropout(0.3),
-
-    Dense(1, activation='sigmoid')
-])
-
-nn_model_rnn.compile(optimizer=Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=['accuracy'])
-
-# Train the model
-history = nn_model_rnn.fit(X_train_scaled_reshaped, y_train_adjusted, epochs=50, batch_size=128, validation_split=0.2)
-```
 ## Results and Observations
 We evaluate each model's performance on the testing set using a classification report that provides detailed metrics like precision, recall, and F1-score. Additionally, we assess the model's ability to distinguish between classes by calculating the AUC (Area Under the Curve) from the ROC (Receiver Operating Characteristic) curve, alongside plotting the curve to visualize performance. To further analyze the model's predictive capability, we generate a confusion matrix visualized as a heatmap. This not only shows the number of correct and incorrect predictions but also offers insights into the type of errors made by the model.
 
